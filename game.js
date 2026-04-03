@@ -607,4 +607,20 @@ class Tentoo {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => new Tentoo());
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const response = await fetch('palavras_aceitas.txt');
+    if (response.ok) {
+      const text = await response.text();
+      text.split('\n').forEach(word => {
+        const trimmed = word.trim();
+        if (trimmed) {
+          NORMALIZED_SET.add(normalize(trimmed));
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error loading accepted words:', error);
+  }
+  new Tentoo();
+});
