@@ -35,94 +35,142 @@ function hashDate(dateStr) {
   return Math.floor((targetDate - adjustedBaseDate) / 864e5);
 }
 
-/** @returns {{ original: string, normalized: string }} Exact Termoo word for today (for debug) */
-function getTermoooWordOfTheDay() {
-  const dateStr = getTodayDateString();
-  const index = hashDate(dateStr) % WORDS.length;
-  const original = WORDS[index];
-  return { original, normalized: normalize(original) };
-}
+const MODES_CONFIG = {
+  normal: { boards: 1, rows: 6 },
+  dueto: { boards: 2, rows: 7 },
+  quarteto: { boards: 4, rows: 9 }
+};
 
-/** @returns {{ original: string, normalized: string }} Selected word for today (inverse of Termoo) */
-function getWordOfTheDay() {
+/** @param {string} mode @returns { original: string[], normalized: string[], termooDebug: string[] } */
+function getWordsForMode(mode) {
   const dateStr = getTodayDateString();
-  const termooIndex = hashDate(dateStr) % WORDS.length;
-  const index = WORDS.length - 1 - termooIndex;
-  const original = WORDS[index];
-  return { original, normalized: normalize(original) };
-}
+  const baseDayCount = hashDate(dateStr);
+  const dayCount = mode === 'normal' ? baseDayCount : baseDayCount - 51;
 
-/** @returns {{ played: number, won: number, streak: number, maxStreak: number, distribution: number[], lastDate: string }} */
-function loadStats() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) return JSON.parse(raw);
+  let termooIndexes = [];
+  if (mode === 'normal') {
+    termooIndexes = [dayCount % WORDS.length];
+  } else if (mode === 'dueto') {
+    const base = (2 * dayCount) % WORDS.length;
+    termooIndexes = [base, (base + 1) % WORDS.length];
+  } else if (mode === 'quarteto') {
+    const base = (4 * dayCount) % WORDS.length;
+    termooIndexes = [base, (base + 1) % WORDS.length, (base + 2) % WORDS.length, (base + 3) % WORDS.length];
+  }
+
+  const tentooIndexes = termooIndexes.map(t => WORDS.length - 1 - t);
+
   return {
-    played: 0,
-    won: 0,
-    streak: 0,
-    maxStreak: 0,
-    distribution: [0, 0, 0, 0, 0, 0],
-    lastDate: ''
+    original: tentooIndexes.map(i => WORDS[i]),
+    normalized: tentooIndexes.map(i => normalize(WORDS[i])),
+    termooDebug: termooIndexes.map(i => WORDS[i])
   };
 }
 
-/** @param {object} stats */
-function saveStats(stats) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
-}
-
-/** @returns {{ date: string, guesses: string[][], currentRow: number, finished: boolean, won: boolean } | null} */
-function loadGameState() {
-  const raw = localStorage.getItem(GAME_STATE_KEY);
-  if (!raw) return null;
-  const state = JSON.parse(raw);
-  if (state.date !== getTodayDateString()) return null;
-  return state;
-}
-
-/** @param {object} state */
-function saveGameState(state) {
-  localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
-}
-
 class Tentoo {
-  constructor() {
-    this.word = getWordOfTheDay();
-    this.guesses = Array.from({ length: ROWS }, () => []);
+  constructor(mode = 'normal') {
+    this.mode = mode;
+    this.wordsObj = getWordsForMode(mode);
+    this.wordsOriginal = this.wordsObj.original;
+    this.words = this.wordsObj.normalized;
+    this.termooDebug = this.wordsObj.termooDebug;
+    
+    const config = MODES_CONFIG[mode];
+    this.boardsCount = config.boards;
+    this.maxRows = config.rows;
+
+    this.guesses = Array.from({ length: this.maxRows }, () => []);
     this.currentRow = 0;
     this.currentCol = 0;
+    
+    this.boardStatus = Array(this.boardsCount).fill(false);
     this.finished = false;
     this.won = false;
     this.keyStates = {};
     this.isAnimating = false;
 
-    this.boardEl = document.getElementById('board');
+    this.boardsContainerEl = document.getElementById('boards-container');
     this.keyboardEl = document.getElementById('keyboard');
     this.toastContainer = document.getElementById('toast-container');
-    this.modalOverlay = document.getElementById('modal-overlay');
-    this.modalContent = document.getElementById('modal-content');
+    this.modalOverlay = document.getElementById('help-modal-overlay');
+    
+    // Result screen variables (using a dedicated logic to prevent overlapping with help modal)
+    this.resultOverlay = document.createElement('div');
+    this.resultOverlay.className = 'modal-overlay hidden';
+    this.resultOverlay.innerHTML = '<div class="modal"><button class="modal-close">&times;</button><div class="result-content"></div></div>';
+    document.body.appendChild(this.resultOverlay);
+    this.resultContent = this.resultOverlay.querySelector('.result-content');
+    this.resultCloseBtn = this.resultOverlay.querySelector('.modal-close');
 
-    this.buildBoard();
+    this.storageKeyStats = STORAGE_KEY + (mode === 'normal' ? '' : '_' + mode);
+    this.storageKeyGame = GAME_STATE_KEY + (mode === 'normal' ? '' : '_' + mode);
+
+    this.boardsContainerEl.innerHTML = '';
+    this.keyboardEl.innerHTML = '';
+    
+    document.body.className = '';
+    if (mode !== 'normal') document.body.classList.add(`mode-${mode}`);
+
+    this.buildBoards();
     this.buildKeyboard();
     this.bindEvents();
     this.restoreGameState();
   }
 
-  buildBoard() {
-    this.tiles = [];
-    for (let r = 0; r < ROWS; r++) {
-      const rowEl = document.createElement('div');
-      rowEl.className = 'row';
-      const rowTiles = [];
-      for (let c = 0; c < COLS; c++) {
-        const tile = document.createElement('div');
-        tile.className = 'tile';
-        tile.id = `tile-${r}-${c}`;
-        rowEl.appendChild(tile);
-        rowTiles.push(tile);
+  loadStats() {
+    const raw = localStorage.getItem(this.storageKeyStats);
+    if (raw) return JSON.parse(raw);
+    return { played: 0, won: 0, streak: 0, maxStreak: 0, distribution: Array(this.maxRows).fill(0), lastDate: '' };
+  }
+
+  saveStats(stats) {
+    localStorage.setItem(this.storageKeyStats, JSON.stringify(stats));
+  }
+
+  loadGameState() {
+    const raw = localStorage.getItem(this.storageKeyGame);
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    if (state.date !== getTodayDateString()) return null;
+    return state;
+  }
+
+  saveGameState() {
+    localStorage.setItem(this.storageKeyGame, JSON.stringify({
+      date: getTodayDateString(),
+      guesses: this.guesses,
+      currentRow: this.currentRow,
+      finished: this.finished,
+      won: this.won,
+      boardStatus: this.boardStatus
+    }));
+  }
+
+  buildBoards() {
+    this.boardsTiles = [];
+    this.boardsEls = [];
+    for (let b = 0; b < this.boardsCount; b++) {
+      const boardEl = document.createElement('div');
+      boardEl.className = 'board';
+      boardEl.id = `board-${b}`;
+      
+      const tiles = [];
+      for (let r = 0; r < this.maxRows; r++) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'row';
+        const rowTiles = [];
+        for (let c = 0; c < COLS; c++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          rowEl.appendChild(tile);
+          rowTiles.push(tile);
+        }
+        boardEl.appendChild(rowEl);
+        tiles.push(rowTiles);
       }
-      this.boardEl.appendChild(rowEl);
-      this.tiles.push(rowTiles);
+      this.boardsContainerEl.appendChild(boardEl);
+      this.boardsEls.push(boardEl);
+      this.boardsTiles.push(tiles);
     }
   }
 
@@ -131,67 +179,54 @@ class Tentoo {
     KEYBOARD_LAYOUT.forEach(row => {
       const rowEl = document.createElement('div');
       rowEl.className = 'keyboard-row';
-
       row.forEach(key => {
         const btn = document.createElement('button');
         btn.className = 'key';
-        btn.id = `key-${key}`;
-
-        if (key === 'enter') {
-          btn.textContent = 'Enter';
-          btn.classList.add('wide');
-        } else if (key === 'backspace') {
-          btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 4l-7 8 7 8h14V4H9z"/><line x1="15" y1="9" x2="11" y2="15"/><line x1="11" y1="9" x2="15" y2="15"/></svg>`;
-          btn.classList.add('wide');
-        } else {
-          btn.textContent = key;
-        }
-
+        if (key === 'enter') { btn.textContent = 'Enter'; btn.classList.add('wide'); }
+        else if (key === 'backspace') { btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 4l-7 8 7 8h14V4H9z"/><line x1="15" y1="9" x2="11" y2="15"/><line x1="11" y1="9" x2="15" y2="15"/></svg>`; btn.classList.add('wide'); }
+        else { btn.textContent = key; }
         btn.addEventListener('click', () => this.handleKey(key));
         rowEl.appendChild(btn);
         this.keys[key] = btn;
       });
-
       this.keyboardEl.appendChild(rowEl);
     });
   }
 
   bindEvents() {
-    document.addEventListener('keydown', (e) => {
+    this.keyHandler = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-      if (e.key === 'Enter') {
-        this.handleKey('enter');
-      } else if (e.key === 'Backspace') {
-        this.handleKey('backspace');
-      } else {
+      if (e.key === 'Enter') this.handleKey('enter');
+      else if (e.key === 'Backspace') this.handleKey('backspace');
+      else {
         let keyChar = e.key.toLowerCase();
-        if (/^[a-záéíóúâêôãõç]$/.test(keyChar)) {
-          keyChar = normalize(keyChar);
-          this.handleKey(keyChar);
-        }
+        if (/^[a-záéíóúâêôãõç]$/.test(keyChar)) this.handleKey(normalize(keyChar));
       }
-    });
+    };
+    document.addEventListener('keydown', this.keyHandler);
 
-    document.getElementById('help-btn').addEventListener('click', () => this.showHelp());
-    document.getElementById('help-modal-close').addEventListener('click', () => this.closeHelp());
+    this.resultCloseBtn.addEventListener('click', () => this.resultOverlay.classList.add('hidden'));
+    this.resultOverlay.addEventListener('click', (e) => { if (e.target === this.resultOverlay) this.resultOverlay.classList.add('hidden'); });
+  }
 
-    document.getElementById('stats-btn').addEventListener('click', () => this.showStats());
-    document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
-    this.modalOverlay.addEventListener('click', (e) => {
-      if (e.target === this.modalOverlay) this.closeModal();
-    });
-
-    const helpOverlay = document.getElementById('help-modal-overlay');
-    helpOverlay.addEventListener('click', (e) => {
-      if (e.target === helpOverlay) this.closeHelp();
-    });
+  destroy() {
+    document.removeEventListener('keydown', this.keyHandler);
+    this.resultOverlay.remove();
   }
 
   restoreGameState() {
-    const saved = loadGameState();
+    if (this.mode === 'normal') {
+      setTimeout(() => {
+        const tooltip = document.getElementById('help-tooltip');
+        if (tooltip) {
+          tooltip.classList.remove('hidden');
+          setTimeout(() => tooltip.classList.add('hidden'), 3000);
+        }
+      }, 100);
+    }
+
+    const saved = this.loadGameState();
     if (!saved) {
-      setTimeout(() => this.showHelp(), 100);
       return;
     }
 
@@ -199,140 +234,91 @@ class Tentoo {
     this.finished = saved.finished;
     this.won = saved.won;
     this.guesses = saved.guesses;
+    this.boardStatus = saved.boardStatus || Array(this.boardsCount).fill(false);
 
     for (let r = 0; r < saved.guesses.length; r++) {
       const guess = saved.guesses[r];
       if (!guess.length) continue;
+      const strGuess = guess.join('');
 
-      for (let c = 0; c < guess.length; c++) {
-        this.tiles[r][c].textContent = guess[c];
-        this.tiles[r][c].classList.add('filled');
-      }
-
-      if (r < this.currentRow) {
-        const result = this.evaluateGuess(guess.join(''));
-        for (let c = 0; c < COLS; c++) {
-          this.tiles[r][c].classList.add(result[c]);
-          this.updateKeyState(guess[c], result[c]);
+      for (let b = 0; b < this.boardsCount; b++) {
+        for (let c = 0; c < guess.length; c++) {
+          const tile = this.boardsTiles[b][r][c];
+          tile.textContent = guess[c];
+          tile.classList.add('filled');
+        }
+        if (r < this.currentRow) {
+          const result = this.evaluateGuessForBoard(strGuess, b);
+          for (let c = 0; c < COLS; c++) {
+            this.boardsTiles[b][r][c].classList.add(result[c]);
+          }
         }
       }
     }
 
+    for (let b = 0; b < this.boardsCount; b++) {
+      if (this.boardStatus[b]) this.boardsEls[b].classList.add('finished');
+    }
+
     this.currentCol = this.finished ? 0 : (this.guesses[this.currentRow]?.length || 0);
 
-    Object.entries(this.keyStates).forEach(([key, state]) => {
-      if (this.keys[key]) this.keys[key].classList.add(state);
-    });
+    if (this.currentRow > 0) this.recomputeKeyboard();
 
-    if (this.finished) {
-      setTimeout(() => this.showEndScreen(), 600);
-    }
+    if (this.finished) setTimeout(() => this.showEndScreen(), 600);
   }
 
-  /** @param {string} key */
   handleKey(key) {
     if (this.finished || this.isAnimating) return;
-
-    if (key === 'enter') {
-      this.submitGuess();
-    } else if (key === 'backspace') {
-      this.deleteLetter();
-    } else {
-      this.addLetter(key);
-    }
+    if (key === 'enter') this.submitGuess();
+    else if (key === 'backspace') this.deleteLetter();
+    else this.addLetter(key);
   }
 
-  /** @param {string} letter */
   addLetter(letter) {
     if (this.currentCol >= COLS) return;
-
     this.guesses[this.currentRow][this.currentCol] = letter;
-    const tile = this.tiles[this.currentRow][this.currentCol];
-    tile.textContent = letter;
-    tile.classList.add('filled');
+    for (let b = 0; b < this.boardsCount; b++) {
+      if (this.boardStatus[b] && this.currentRow > 0) continue;
+      const tile = this.boardsTiles[b][this.currentRow][this.currentCol];
+      tile.textContent = letter;
+      tile.classList.add('filled');
+    }
     this.currentCol++;
   }
 
   deleteLetter() {
     if (this.currentCol <= 0) return;
-
     this.currentCol--;
     this.guesses[this.currentRow][this.currentCol] = undefined;
     this.guesses[this.currentRow].length = this.currentCol;
-    const tile = this.tiles[this.currentRow][this.currentCol];
-    tile.textContent = '';
-    tile.classList.remove('filled');
+    for (let b = 0; b < this.boardsCount; b++) {
+      if (this.boardStatus[b] && this.currentRow > 0) continue;
+      const tile = this.boardsTiles[b][this.currentRow][this.currentCol];
+      tile.textContent = '';
+      tile.classList.remove('filled');
+    }
   }
 
-  submitGuess() {
-    if (this.currentCol < COLS) {
-      this.shakeRow();
-      this.showToast('Palavra incompleta');
-      return;
+  shakeRows() {
+    for (let b = 0; b < this.boardsCount; b++) {
+      if (this.boardStatus[b] && this.currentRow > 0) continue;
+      this.boardsTiles[b][this.currentRow].forEach(t => {
+        t.classList.add('shake');
+        t.addEventListener('animationend', () => t.classList.remove('shake'), { once: true });
+      });
     }
-
-    const guess = this.guesses[this.currentRow].join('');
-
-    if (!NORMALIZED_SET.has(guess)) {
-      this.shakeRow();
-      this.showToast('Palavra não encontrada (apague para tentar de novo)');
-      return;
-    }
-
-    const result = this.evaluateGuess(guess);
-    this.isAnimating = true;
-    this.revealRow(result, guess).then(() => {
-      this.isAnimating = false;
-
-      const isCorrect = result.every(r => r === 'correct');
-
-      if (isCorrect) {
-        this.finished = true;
-        this.won = true;
-        this.currentRow++;
-        this.bounceRow(this.currentRow - 1);
-        this.saveState();
-
-        const stats = loadStats();
-        stats.played++;
-        stats.won++;
-        stats.distribution[this.currentRow - 1]++;
-        stats.lastDate = getTodayDateString();
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-        stats.streak = stats.lastDate === yesterdayStr || stats.streak > 0 ? stats.streak + 1 : 1;
-        stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
-        saveStats(stats);
-
-        setTimeout(() => this.showEndScreen(), 1200);
-      } else if (this.currentRow >= ROWS - 1) {
-        this.finished = true;
-        this.won = false;
-        this.currentRow++;
-        this.saveState();
-
-        const stats = loadStats();
-        stats.played++;
-        stats.streak = 0;
-        stats.lastDate = getTodayDateString();
-        saveStats(stats);
-
-        setTimeout(() => this.showEndScreen(), 800);
-      } else {
-        this.currentRow++;
-        this.currentCol = 0;
-        this.saveState();
-      }
-    });
   }
 
-  /**
-   * @param {string} guess
-   * @returns {string[]} Array of 'correct', 'present', or 'absent'
-   */
-  evaluateGuess(guess) {
-    const target = this.word.normalized;
+  showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    this.toastContainer.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  evaluateGuessForBoard(guess, boardIndex) {
+    const target = this.words[boardIndex];
     const result = Array(COLS).fill('absent');
     const targetLetters = target.split('');
     const guessLetters = guess.split('');
@@ -353,30 +339,112 @@ class Tentoo {
         }
       }
     });
-
     return result;
   }
 
-  /**
-   * @param {string[]} result
-   * @param {string} guess
-   * @returns {Promise<void>}
-   */
-  revealRow(result, guess) {
+  recomputeKeyboard() {
+    this.keyStates = {};
+    const priority = { correct: 3, present: 2, absent: 1, undefined: 0 };
+    
+    for (let r = 0; r < this.currentRow; r++) {
+      const g = this.guesses[r].join('');
+      for (let b = 0; b < this.boardsCount; b++) {
+        if (this.boardStatus[b]) continue;
+        const res = this.evaluateGuessForBoard(g, b);
+        for (let c = 0; c < COLS; c++) {
+          const letter = g[c];
+          const curr = priority[this.keyStates[letter]] || 0;
+          if (priority[res[c]] > curr) this.keyStates[letter] = res[c];
+        }
+      }
+    }
+    
+    Object.keys(this.keys).forEach(k => {
+      const keyEl = this.keys[k];
+      keyEl.classList.remove('correct', 'present', 'absent');
+      if (this.keyStates[k]) keyEl.classList.add(this.keyStates[k]);
+    });
+  }
+
+  submitGuess() {
+    if (this.currentCol < COLS) {
+      this.shakeRows();
+      this.showToast('Palavra incompleta');
+      return;
+    }
+    const strGuess = this.guesses[this.currentRow].join('');
+    if (!NORMALIZED_SET.has(strGuess)) {
+      this.shakeRows();
+      this.showToast('Palavra repetida ou não encontrada');
+      return;
+    }
+
+    this.isAnimating = true;
+    const animations = [];
+    
+    for (let b = 0; b < this.boardsCount; b++) {
+      if (this.boardStatus[b]) continue;
+      const result = this.evaluateGuessForBoard(strGuess, b);
+      animations.push(this.revealBoardRow(b, result, strGuess));
+    }
+
+    Promise.all(animations).then(() => {
+      this.isAnimating = false;
+      let allWon = true;
+
+      for (let b = 0; b < this.boardsCount; b++) {
+        if (this.boardStatus[b]) continue;
+        const result = this.evaluateGuessForBoard(strGuess, b);
+        const isCorrect = result.every(r => r === 'correct');
+        if (isCorrect) {
+          this.boardStatus[b] = true;
+          this.boardsEls[b].classList.add('finished');
+          this.bounceBoardRow(b, this.currentRow);
+        }
+        if (!this.boardStatus[b]) allWon = false;
+      }
+
+      this.currentRow++;
+      this.recomputeKeyboard();
+
+      if (allWon) {
+        this.finished = true;
+        this.won = true;
+        this.saveGameState();
+        
+        const stats = this.loadStats();
+        stats.played++; stats.won++; stats.distribution[this.currentRow - 1]++;
+        stats.lastDate = getTodayDateString();
+        const y = new Date(); y.setDate(y.getDate() - 1);
+        stats.streak = stats.lastDate === y.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) || stats.streak > 0 ? stats.streak + 1 : 1;
+        stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
+        this.saveStats(stats);
+        
+        setTimeout(() => this.showEndScreen(), 1200);
+      } else if (this.currentRow >= this.maxRows) {
+        this.finished = true;
+        this.won = false;
+        this.saveGameState();
+        const stats = this.loadStats();
+        stats.played++; stats.streak = 0; stats.lastDate = getTodayDateString();
+        this.saveStats(stats);
+        setTimeout(() => this.showEndScreen(), 800);
+      } else {
+        this.currentCol = 0;
+        this.saveGameState();
+      }
+    });
+  }
+
+  revealBoardRow(b, result, strGuess) {
     return new Promise(resolve => {
       const row = this.currentRow;
       let revealed = 0;
-
       result.forEach((state, i) => {
         setTimeout(() => {
-          const tile = this.tiles[row][i];
+          const tile = this.boardsTiles[b][row][i];
           tile.classList.add('flip');
-
-          setTimeout(() => {
-            tile.classList.add(state);
-            this.updateKeyState(guess[i], state);
-          }, 250);
-
+          setTimeout(() => tile.classList.add(state), 250);
           tile.addEventListener('animationend', () => {
             revealed++;
             if (revealed === COLS) resolve();
@@ -386,226 +454,93 @@ class Tentoo {
     });
   }
 
-  /**
-   * @param {string} letter
-   * @param {string} state
-   */
-  updateKeyState(letter, state) {
-    const priority = { correct: 3, present: 2, absent: 1 };
-    const current = this.keyStates[letter];
-    const currentPriority = current ? priority[current] : 0;
-
-    if (priority[state] > currentPriority) {
-      this.keyStates[letter] = state;
-      const keyEl = this.keys[letter];
-      if (keyEl) {
-        keyEl.classList.remove('correct', 'present', 'absent');
-        keyEl.classList.add(state);
-      }
-    }
-  }
-
-  shakeRow() {
-    const rowTiles = this.tiles[this.currentRow];
-    rowTiles.forEach(tile => {
-      tile.classList.add('shake');
-      tile.addEventListener('animationend', () => tile.classList.remove('shake'), { once: true });
-    });
-  }
-
-  /** @param {number} row */
-  bounceRow(row) {
-    const rowTiles = this.tiles[row];
-    rowTiles.forEach((tile, i) => {
+  bounceBoardRow(b, row) {
+    this.boardsTiles[b][row].forEach((t, i) => {
       setTimeout(() => {
-        tile.classList.add('bounce');
-        tile.addEventListener('animationend', () => tile.classList.remove('bounce'), { once: true });
+        t.classList.add('bounce');
+        t.addEventListener('animationend', () => t.classList.remove('bounce'), { once: true });
       }, i * 80);
     });
   }
 
-  /** @param {string} message */
-  showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = message;
-    this.toastContainer.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-  }
-
-  saveState() {
-    saveGameState({
-      date: getTodayDateString(),
-      guesses: this.guesses,
-      currentRow: this.currentRow,
-      finished: this.finished,
-      won: this.won
-    });
-  }
-
   showEndScreen() {
-    const stats = loadStats();
+    const stats = this.loadStats();
     const maxDist = Math.max(...stats.distribution, 1);
     const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
+    
+    let wordsHtml = '';
+    this.wordsOriginal.forEach(w => wordsHtml += `<div class="result-word ${this.won ? 'win' : 'lose'}">${w}</div>`);
 
     let html = `
-      <div class="result-section" style="border:none; padding-top:0; margin-bottom:20px;">
-        <div class="result-word ${this.won ? 'win' : 'lose'}">${this.word.original}</div>
-        <div class="result-message">${this.won
-          ? `Parabéns! Você acertou em ${this.currentRow} tentativa${this.currentRow > 1 ? 's' : ''}.`
-          : 'Não foi dessa vez! Tente novamente amanhã.'}
-        </div>
+      <div class="result-section" style="border:none; padding-top:0; margin-bottom:20px; text-align:center;">
+        <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap; margin-bottom:12px;">${wordsHtml}</div>
+        <div class="result-message">${this.won ? `Sensacional! Completo em ${this.currentRow} tentativa(s).` : 'Não foi dessa vez! Volte amanhã.'}</div>
       </div>
-
-      <div class="stats-title">Estatísticas</div>
+      <div class="stats-title">Estatísticas - ${this.mode.toUpperCase()}</div>
       <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">${stats.played}</div>
-          <div class="stat-label">Jogos</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${winRate}</div>
-          <div class="stat-label">% Vitórias</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.streak}</div>
-          <div class="stat-label">Sequência</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.maxStreak}</div>
-          <div class="stat-label">Melhor Seq.</div>
-        </div>
+        <div class="stat-item"><div class="stat-value">${stats.played}</div><div class="stat-label">Jogos</div></div>
+        <div class="stat-item"><div class="stat-value">${winRate}</div><div class="stat-label">% Vitória</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.streak}</div><div class="stat-label">Sequência</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.maxStreak}</div><div class="stat-label">Melhor Seq.</div></div>
       </div>
-
       <div class="distribution-title">Distribuição</div>
       <div class="distribution">
-        ${stats.distribution.map((count, i) => `
-          <div class="dist-row">
-            <div class="dist-label">${i + 1}</div>
-            <div class="dist-bar ${this.won && i === this.currentRow - 1 ? 'highlight' : ''}"
-                 style="width: ${Math.max(8, (count / maxDist) * 100)}%">${count}</div>
-          </div>
-        `).join('')}
+        ${stats.distribution.map((count, i) => `<div class="dist-row"><div class="dist-label">${i + 1}</div><div class="dist-bar ${this.won && i === this.currentRow - 1 ? 'highlight' : ''}" style="width: ${Math.max(8, (count / maxDist) * 100)}%">${count}</div></div>`).join('')}
       </div>
-
       <div class="result-section">
-        <button class="share-btn" id="share-btn">Compartilhar</button>
-        <div class="next-word-timer">Próxima palavra em <span id="countdown"></span></div>
+        <button class="share-btn" id="share-btn">Compartilhar ${this.mode.toUpperCase()}</button>
       </div>
     `;
 
-    this.modalContent.innerHTML = html;
-    this.modalOverlay.classList.remove('hidden');
-
+    this.resultContent.innerHTML = html;
+    this.resultOverlay.classList.remove('hidden');
     document.getElementById('share-btn').addEventListener('click', () => this.shareResult());
-    this.startCountdown();
   }
 
   showStats() {
-    if (this.finished) {
-      this.showEndScreen();
-      return;
-    }
-
-    const stats = loadStats();
+    if (this.finished) { this.showEndScreen(); return; }
+    const stats = this.loadStats();
     const maxDist = Math.max(...stats.distribution, 1);
     const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
-
+    
     let html = `
-      <div class="stats-title">Estatísticas</div>
+      <div class="stats-title">Estatísticas - ${this.mode.toUpperCase()}</div>
       <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">${stats.played}</div>
-          <div class="stat-label">Jogos</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${winRate}</div>
-          <div class="stat-label">% Vitórias</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.streak}</div>
-          <div class="stat-label">Sequência</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${stats.maxStreak}</div>
-          <div class="stat-label">Melhor Seq.</div>
-        </div>
+        <div class="stat-item"><div class="stat-value">${stats.played}</div><div class="stat-label">Jogos</div></div>
+        <div class="stat-item"><div class="stat-value">${winRate}</div><div class="stat-label">% Vitória</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.streak}</div><div class="stat-label">Sequência</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.maxStreak}</div><div class="stat-label">Melhor Seq.</div></div>
       </div>
-
       <div class="distribution-title">Distribuição</div>
       <div class="distribution">
-        ${stats.distribution.map((count, i) => `
-          <div class="dist-row">
-            <div class="dist-label">${i + 1}</div>
-            <div class="dist-bar" style="width: ${Math.max(8, (count / maxDist) * 100)}%">${count}</div>
-          </div>
-        `).join('')}
+        ${stats.distribution.map((count, i) => `<div class="dist-row"><div class="dist-label">${i + 1}</div><div class="dist-bar" style="width: ${Math.max(8, (count / maxDist) * 100)}%">${count}</div></div>`).join('')}
       </div>
     `;
-
-    this.modalContent.innerHTML = html;
-    this.modalOverlay.classList.remove('hidden');
-  }
-
-  showHelp() {
-    document.getElementById('help-modal-overlay').classList.remove('hidden');
-  }
-
-  closeHelp() {
-    document.getElementById('help-modal-overlay').classList.add('hidden');
-  }
-
-  closeModal() {
-    this.modalOverlay.classList.add('hidden');
-    if (this.countdownInterval) {
-      clearInterval(this.countdownInterval);
-      this.countdownInterval = null;
-    }
+    this.resultContent.innerHTML = html;
+    this.resultOverlay.classList.remove('hidden');
   }
 
   shareResult() {
-    const emojiMap = {
-      correct: '🟩',
-      present: '🟧',
-      absent: '⬛'
-    };
+    const emojiMap = { correct: '🟩', present: '🟧', absent: '⬛' };
+    let text = `Tentoo ${getTodayDateString()} ${this.won ? this.currentRow : 'X'}/${this.maxRows}`;
+    if (this.mode !== 'normal') text += ` [${this.mode.toUpperCase()}]`;
+    text += `\n\n`;
 
-    let text = `Tentoo ${getTodayDateString()} ${this.won ? this.currentRow : 'X'}/${ROWS}\n\n`;
-
-    for (let r = 0; r < this.currentRow; r++) {
-      const guess = this.guesses[r].join('');
-      const result = this.evaluateGuess(guess);
-      text += result.map(s => emojiMap[s]).join('') + '\n';
+    for (let b = 0; b < this.boardsCount; b++) {
+      for (let r = 0; r < this.currentRow; r++) {
+        const strGuess = this.guesses[r].join('');
+        const res = this.evaluateGuessForBoard(strGuess, b);
+        text += res.map(s => emojiMap[s]).join('') + '\n';
+        if (this.boardStatus[b] && res.every(x => x === 'correct')) break;
+      }
+      text += '\n';
     }
-    text += '\nhttps://tentoo.pages.dev';
-
-    navigator.clipboard.writeText(text.trim()).then(() => {
-      this.showToast('Copiado para a área de transferência!');
-    }).catch(() => {
-      this.showToast('Erro ao copiar');
-    });
-  }
-
-  startCountdown() {
-    const updateTimer = () => {
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      const diff = tomorrow - now;
-
-      const hours = String(Math.floor(diff / 3600000)).padStart(2, '0');
-      const minutes = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-      const seconds = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-
-      const el = document.getElementById('countdown');
-      if (el) el.textContent = `${hours}:${minutes}:${seconds}`;
-    };
-
-    updateTimer();
-    this.countdownInterval = setInterval(updateTimer, 1000);
+    text += 'https://tentoo.pages.dev';
+    navigator.clipboard.writeText(text.trim()).then(() => this.showToast('Copiado!')).catch(() => this.showToast('Erro'));
   }
 }
+
+let currentGame = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -614,13 +549,95 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = await response.text();
       text.split('\n').forEach(word => {
         const trimmed = word.trim();
-        if (trimmed) {
-          NORMALIZED_SET.add(normalize(trimmed));
-        }
+        if (trimmed) NORMALIZED_SET.add(normalize(trimmed));
       });
     }
-  } catch (error) {
-    console.error('Error loading accepted words:', error);
+  } catch (error) { console.error('Error loading accepted words:', error); }
+  
+  currentGame = new Tentoo('normal');
+
+  // Mode Dropdown Logic
+  const modeToggle = document.getElementById('mode-toggle');
+  const modeDropdown = document.getElementById('mode-dropdown');
+
+  if (modeToggle) {
+    modeToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modeDropdown.classList.toggle('hidden');
+    });
+    
+    document.addEventListener('click', (e) => {
+      if (!modeDropdown.contains(e.target)) {
+        modeDropdown.classList.add('hidden');
+      }
+    });
+
+    document.querySelectorAll('.mode-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        modeDropdown.classList.add('hidden');
+        if (currentGame) currentGame.destroy();
+        currentGame = new Tentoo(mode);
+      });
+    });
   }
-  new Tentoo();
+
+  // Global Help & Debug Logic
+  const helpBtn = document.getElementById('help-btn');
+  let debugTimer;
+  let isLongPress = false;
+
+  const startDebug = () => {
+    isLongPress = false;
+    debugTimer = setTimeout(() => {
+      isLongPress = true;
+      if (!currentGame) return;
+      let text = `[ DEBUG MODE ]\n\n🎯 TENTOO (Invertido):\n`;
+      currentGame.wordsOriginal.forEach((w, i) => text += `- Tabuleiro ${i + 1}: ${w}\n`);
+      text += `\n🤖 TERMOO (Original):\n`;
+      currentGame.termooDebug.forEach((w, i) => text += `- Tabuleiro ${i + 1}: ${w}\n`);
+      
+      document.getElementById('debug-modal-content').textContent = text;
+      document.getElementById('debug-modal-overlay').classList.remove('hidden');
+    }, 7000);
+  };
+  const cancelDebug = () => clearTimeout(debugTimer);
+
+  const debugOverlay = document.getElementById('debug-modal-overlay');
+  document.getElementById('debug-modal-close').addEventListener('click', () => debugOverlay.classList.add('hidden'));
+  debugOverlay.addEventListener('click', (e) => {
+    if (e.target === debugOverlay) debugOverlay.classList.add('hidden');
+  });
+
+  if (helpBtn) {
+    helpBtn.addEventListener('contextmenu', e => {
+      e.preventDefault();
+    });
+
+    helpBtn.addEventListener('pointerdown', startDebug);
+    helpBtn.addEventListener('pointerup', cancelDebug);
+    helpBtn.addEventListener('pointerleave', cancelDebug);
+    helpBtn.addEventListener('pointercancel', cancelDebug);
+
+    helpBtn.addEventListener('click', (e) => {
+      if (isLongPress) {
+        isLongPress = false;
+        e.preventDefault();
+        return;
+      }
+      document.getElementById('help-modal-overlay').classList.remove('hidden');
+    });
+  }
+
+  const helpOverlay = document.getElementById('help-modal-overlay');
+  document.getElementById('help-modal-close').addEventListener('click', () => helpOverlay.classList.add('hidden'));
+  helpOverlay.addEventListener('click', (e) => {
+    if (e.target === helpOverlay) helpOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('stats-btn').addEventListener('click', () => {
+    if (currentGame) currentGame.showStats();
+  });
 });

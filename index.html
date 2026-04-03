@@ -29,21 +29,38 @@
 
   <header id="header">
     <div class="header-content">
-      <button id="help-btn" aria-label="Como jogar">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-      </button>
-      <h1 id="logo">
-        <span class="logo-letter" style="--i:0">T</span>
-        <span class="logo-letter" style="--i:1">E</span>
-        <span class="logo-letter" style="--i:2">N</span>
-        <span class="logo-letter" style="--i:3">T</span>
-        <span class="logo-letter" style="--i:4">O</span>
-        <span class="logo-letter accent" style="--i:5">O</span>
-      </h1>
+      <div class="header-left">
+        <button id="help-btn" aria-label="Como jogar">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+        <div id="help-tooltip" class="tooltip hidden">Clique aqui para saber como jogar</div>
+        
+        <div class="mode-dropdown-container">
+          <button id="mode-toggle" class="mode-toggle" aria-label="Modo de Jogo">
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="mode-dropdown" class="mode-dropdown hidden">
+            <button class="mode-option active" data-mode="normal">Normal</button>
+            <button class="mode-option" data-mode="dueto">Dueto</button>
+            <button class="mode-option" data-mode="quarteto">Quarteto</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <h1 id="logo">
+          <span class="logo-letter" style="--i:0">T</span>
+          <span class="logo-letter" style="--i:1">E</span>
+          <span class="logo-letter" style="--i:2">N</span>
+          <span class="logo-letter" style="--i:3">T</span>
+          <span class="logo-letter" style="--i:4">O</span>
+          <span class="logo-letter accent" style="--i:5">O</span>
+        </h1>
+      </div>
       <button id="stats-btn" aria-label="Estatísticas">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="12" width="4" height="9" rx="1"/>
@@ -55,8 +72,10 @@
   </header>
 
   <main id="game">
+
+
     <div id="board-container">
-      <div id="board"></div>
+      <div id="boards-container"></div>
     </div>
 
     <div id="keyboard"></div>
@@ -115,6 +134,18 @@
     <div id="modal" class="modal">
       <button id="modal-close" class="modal-close" aria-label="Fechar">&times;</button>
       <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="debug-modal-overlay" class="modal-overlay hidden">
+    <div class="modal help-modal">
+      <button class="modal-close" id="debug-modal-close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <div class="help-title-container">
+        <h2 class="help-title">MODO DEBUG</h2>
+      </div>
+      <div id="debug-modal-content" class="modal-content" style="text-align: left; font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.6; padding: 20px 0; color: var(--text-primary); white-space: pre-wrap;"></div>
     </div>
   </div>
 
