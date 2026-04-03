@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tentoo - Adivinhe a palavra do dia em 6 tentativas. Um jogo de palavras em português brasileiro.">
+  <title>Tentoo - Palavra do Dia</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="noise-overlay"></div>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <header id="header">
+    <div class="header-content">
+      <button id="help-btn" aria-label="Como jogar">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </button>
+      <h1 id="logo">
+        <span class="logo-letter" style="--i:0">T</span>
+        <span class="logo-letter" style="--i:1">E</span>
+        <span class="logo-letter" style="--i:2">N</span>
+        <span class="logo-letter" style="--i:3">T</span>
+        <span class="logo-letter" style="--i:4">O</span>
+        <span class="logo-letter accent" style="--i:5">O</span>
+      </h1>
+      <button id="stats-btn" aria-label="Estatísticas">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="12" width="4" height="9" rx="1"/>
+          <rect x="10" y="5" width="4" height="16" rx="1"/>
+          <rect x="17" y="8" width="4" height="13" rx="1"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="game">
+    <div id="board-container">
+      <div id="board"></div>
+    </div>
+
+    <div id="keyboard"></div>
+  </main>
+
+  <div id="toast-container"></div>
+
+  <div id="help-modal-overlay" class="modal-overlay hidden">
+    <div class="modal help-modal">
+      <button id="help-modal-close" class="modal-close" aria-label="Fechar">&times;</button>
+      <div id="help-modal-content">
+        <div class="help-title-container">
+          <h2 class="stats-title" style="margin-bottom:0;">Como Jogar</h2>
+        </div>
+        <p class="help-text">Descubra a palavra certa em 6 tentativas. Depois de cada tentativa, as peças mostram o quão perto você está da solução.</p>
+        
+        <div class="help-example">
+          <div class="row help-row">
+            <div class="tile correct help-mini-tile">T</div>
+            <div class="tile help-mini-tile">U</div>
+            <div class="tile help-mini-tile">R</div>
+            <div class="tile help-mini-tile">M</div>
+            <div class="tile help-mini-tile">A</div>
+          </div>
+          <p class="help-text">A letra <strong class="help-strong correct-bg">T</strong> faz parte da palavra e está na posição correta.</p>
+        </div>
+
+        <div class="help-example">
+          <div class="row help-row">
+            <div class="tile help-mini-tile">V</div>
+            <div class="tile help-mini-tile">I</div>
+            <div class="tile present help-mini-tile">O</div>
+            <div class="tile help-mini-tile">L</div>
+            <div class="tile help-mini-tile">A</div>
+          </div>
+          <p class="help-text">A letra <strong class="help-strong present-bg">O</strong> faz parte da palavra mas em outra posição.</p>
+        </div>
+
+        <div class="help-example">
+          <div class="row help-row">
+            <div class="tile help-mini-tile">P</div>
+            <div class="tile help-mini-tile">U</div>
+            <div class="tile help-mini-tile">L</div>
+            <div class="tile absent help-mini-tile">G</div>
+            <div class="tile help-mini-tile">A</div>
+          </div>
+          <p class="help-text">A letra <strong class="help-strong absent-bg">G</strong> não faz parte da palavra.</p>
+        </div>
+
+        <p class="help-text small-text">Os acentos são preenchidos automaticamente, e não são considerados nas dicas.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal" class="modal">
+      <button id="modal-close" class="modal-close" aria-label="Fechar">&times;</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
