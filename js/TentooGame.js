@@ -2,6 +2,7 @@ import { COLS, MODES_CONFIG } from './constants.js';
 import { normalize, getTodayDateString, getWordsForMode } from './helpers.js';
 import { StorageService } from './StorageService.js';
 import { BoardComponent } from './BoardComponent.js';
+import { Confetti } from './Confetti.js';
 
 export class TentooGame {
   constructor(mode, dictionaryService, WORDS, DUETO_INDEXES, QUARTETO_INDEXES) {
@@ -42,6 +43,7 @@ export class TentooGame {
     this.resultCloseBtn = this.resultOverlay.querySelector('.modal-close');
 
     this.storage = new StorageService(mode, this.maxRows);
+    this.confetti = new Confetti();
 
     this.boardsContainerEl.innerHTML = '';
     this.keyboardEl.innerHTML = '';
@@ -102,6 +104,7 @@ export class TentooGame {
 
   destroy() {
     document.removeEventListener('keydown', this.keyHandler);
+    this.confetti.destroy();
     this.resultOverlay.remove();
   }
 
@@ -302,6 +305,7 @@ export class TentooGame {
         this.finished = true;
         this.won = true;
         this.saveGameState();
+        this.confetti.burst(this.wordsOriginal);
 
         const stats = this.loadStats();
         stats.played++; stats.won++; stats.distribution[this.currentRow - 1]++;
@@ -333,7 +337,7 @@ export class TentooGame {
     const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
 
     let wordsHtml = '';
-    this.wordsOriginal.forEach(w => wordsHtml += `<div class="result-word ${this.won ? 'win' : 'lose'}">${w}</div>`);
+    this.wordsOriginal.forEach((w, i) => wordsHtml += `<div class="result-word ${this.won ? 'win' : 'lose'}" style="--wi:${i}">${w}</div>`);
 
     let html = `
       <div class="result-section" style="border:none; padding-top:0; margin-bottom:20px; text-align:center;">

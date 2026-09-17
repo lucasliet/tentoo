@@ -34,6 +34,8 @@
 
   --transition-flip: 500ms;
   --transition-bounce: 300ms;
+
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 body {
@@ -717,6 +719,8 @@ header {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   margin-bottom: 4px;
+  animation: result-word-in 350ms var(--ease-bounce) backwards;
+  animation-delay: calc(var(--wi) * 70ms);
 }
 
 .result-word.win {
@@ -728,6 +732,37 @@ header {
 
 .result-word.lose {
   color: var(--color-present);
+}
+
+.confetti-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  pointer-events: none;
+}
+
+@keyframes result-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes result-word-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-word {
+    animation-name: result-word-fade;
+    animation-duration: 200ms;
+    animation-timing-function: ease;
+  }
 }
 
 .result-message {
