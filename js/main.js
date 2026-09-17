@@ -1,15 +1,28 @@
 import { WORDS, DUETO_INDEXES, QUARTETO_INDEXES } from './constants.js';
 import { DictionaryService } from './DictionaryService.js';
 import { TentooGame } from './TentooGame.js';
+import { WebMCPService } from './WebMCPService.js';
 
 let currentGame = null;
+const dictionaryService = new DictionaryService();
+
+/** @param {string} mode Rebuilds the active game for the given mode and syncs the dropdown */
+const startGame = (mode) => {
+  document.querySelectorAll('.mode-option').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  if (currentGame) currentGame.destroy();
+  currentGame = new TentooGame(mode, dictionaryService, WORDS, DUETO_INDEXES, QUARTETO_INDEXES);
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const dictionaryService = new DictionaryService();
   dictionaryService.initFromWords(WORDS);
   await dictionaryService.loadAcceptedWords('palavras_aceitas.txt');
 
-  currentGame = new TentooGame('normal', dictionaryService, WORDS, DUETO_INDEXES, QUARTETO_INDEXES);
+  startGame('normal');
+
+  new WebMCPService({
+    getGame: () => currentGame,
+    startMode: startGame
+  }).init();
 
   // Mode Dropdown Logic
   const modeToggle = document.getElementById('mode-toggle');
@@ -29,12 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.querySelectorAll('.mode-option').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.mode-option').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const mode = btn.dataset.mode;
         modeDropdown.classList.add('hidden');
-        if (currentGame) currentGame.destroy();
-        currentGame = new TentooGame(mode, dictionaryService, WORDS, DUETO_INDEXES, QUARTETO_INDEXES);
+        startGame(btn.dataset.mode);
       });
     });
   }
@@ -92,4 +101,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('stats-btn').addEventListener('click', () => {
     if (currentGame) currentGame.showStats();
   });
+
+  window.__tentoo = { getGame: () => currentGame, startGame };
 });
