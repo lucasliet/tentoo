@@ -27,7 +27,10 @@
   --font-display: 'Outfit', sans-serif;
   --font-mono: 'Space Mono', monospace;
 
-  --tile-size: clamp(52px, 12vw, 68px);
+  /* Tamanho limitado pela largura útil (5 colunas) e pela altura disponível
+     (viewport menos header, teclado e espaçamentos), o que aproveita melhor
+     telas altas de celular sem estourar em telas baixas ou estreitas. */
+  --tile-size: clamp(48px, min(calc((100vw - 64px) / 5), calc((100dvh - 330px) / var(--rows, 6) - 8px)), 72px);
   --tile-gap: clamp(4px, 1vw, 8px);
   --key-height: clamp(48px, 8vh, 58px);
   --border-radius: 10px;
