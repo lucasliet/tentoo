@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tentoo-jev-opencode"
+version = "0.1.0"
+description = "Tentoo bot that plays the daily word using Jev via OpenCode Zen System One and WebMCP"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+tentoo-jev = "tentoojev.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+python_functions = ["should_*", "test_*"]
