@@ -213,9 +213,9 @@ class WebMcpSession:
         except ValueError as exc:
             raise WebMcpError(f"Invalid game state: {raw}") from exc
 
-    def reset_game(self, mode: str) -> None:
+    def reset_game(self, mode: str, timeout: float = 20.0) -> None:
         self._connection.evaluate(
             f"localStorage.removeItem({json.dumps(game_state_key(mode))})"
         )
         self._connection.evaluate("location.reload()")
-        self.wait_ready()
+        self.wait_ready(timeout)

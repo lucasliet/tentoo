@@ -83,7 +83,7 @@ def build_options(
         for rank, word in enumerate(words):
             rank_sum, coverage = scores.get(word, (0, 0))
             scores[word] = (rank_sum + rank, coverage + 1)
-    ordered = sorted(scores, key=lambda word: (-scores[word][1], scores[word][0]))
+    ordered = sorted(scores, key=lambda word: (-scores[word][1], scores[word][0], word))
     if not exploring:
         return ordered[:limit]
     solvers = {word for pool in pools.values() if len(pool) == 1 for word in pool}
@@ -131,9 +131,4 @@ def build_state_text(state: dict, pools: dict[int, list[str]], options: list[tup
         history = "; ".join(f"{row['guess']} {row['feedback']}" for row in rows) or "none"
         lines.append(f"Board {index + 1} ({len(pool)} candidates): {history}.")
     option_lines = [f"- {word}: {description}" for word, description in options]
-    return "\n".join(
-        [
-            "Options for the next guess:",
-            *option_lines,
-        ]
-    )
+    return "\n".join([*lines, "Options for the next guess:", *option_lines])

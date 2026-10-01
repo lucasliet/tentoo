@@ -13,11 +13,8 @@ function jsonResponse(status, body) {
   });
 }
 
-/**
- * @param {object} body Parsed request body
- * @returns {string | null} Validation error message or null when the body is valid
- */
-function validateBody(body) {
+/** @param {object} body Parsed request body @returns {string | null} Validation error message or null when the body is valid */
+export function validateBody(body) {
   if (!body || typeof body !== 'object') return 'Body must be a JSON object.';
   const { stateText, options, instructions } = body;
   if (typeof stateText !== 'string' || stateText.length === 0 || stateText.length > MAX_STATE_LENGTH) {

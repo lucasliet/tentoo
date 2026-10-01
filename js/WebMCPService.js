@@ -1,7 +1,7 @@
 import { MODES_CONFIG } from './constants.js';
 import { normalize } from './helpers.js';
 import { StorageService } from './StorageService.js';
-import { buildGameState } from './gameState.js';
+import { buildGameState, submitWord } from './gameState.js';
 
 export class WebMCPService {
   /** @param {{ getGame: () => object, startMode: (mode: string) => void }} hooks Accessors for the live game and mode switching */
@@ -142,23 +142,8 @@ export class WebMCPService {
     if (!/^[a-z]{5}$/.test(word)) return 'Invalid word: provide exactly 5 letters (accents are normalized automatically).';
     if (!game.dictionaryService.has(word)) return `"${word}" is not in the Tentoo dictionary.`;
 
-    while (game.currentCol > 0) game.deleteLetter();
-    for (const letter of word) game.addLetter(letter);
-    game.submitGuess();
-    await this.waitForSettle(game);
-    if (game.isAnimating) return 'Submission timed out waiting for the reveal; call get_game_state to check the result.';
+    const accepted = await submitWord(game, word);
+    if (!accepted) return 'Submission timed out waiting for the reveal; call get_game_state to check the result.';
     return `Guess "${word}" submitted.\n${this.serializeState(game)}`;
-  }
-
-  /** @param {object} game @returns {Promise<void>} Resolves once reveal animations settle */
-  waitForSettle(game) {
-    return new Promise(resolve => {
-      const started = Date.now();
-      const poll = () => {
-        if (!game.isAnimating || Date.now() - started > 4000) resolve();
-        else setTimeout(poll, 100);
-      };
-      setTimeout(poll, 200);
-    });
   }
 }

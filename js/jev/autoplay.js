@@ -33,28 +33,36 @@ function pause() {
 
 /** @param {object} state Serialized game state @param {string[]} wordlist @returns {{ pools: Record<number, string[]>, triedWords: Set<string>, triedLetters: Set<string> }} Solver inputs derived from the state */
 function solverInputs(state, wordlist) {
-  const pools = {};
   const triedWords = new Set();
   const triedLetters = new Set();
+  for (const row of state.boards.flatMap(board => board.rows)) {
+    triedWords.add(row.guess);
+    for (const letter of row.guess) triedLetters.add(letter);
+  }
+  const pools = {};
   state.boards.forEach((board, index) => {
     if (board.solved) return;
     pools[index] = filterCandidates(wordlist, board.rows);
-    for (const row of board.rows) {
-      triedWords.add(row.guess);
-      for (const letter of row.guess) triedLetters.add(letter);
-    }
   });
   return { pools, triedWords, triedLetters };
 }
 
-/** @param {object} game Active TentooGame instance @param {string[]} wordlist @returns {Promise<void>} Plays the whole game with Jev decisions */
-async function playGame(game, wordlist) {
+/**
+ * Plays the active game with Jev decisions until it finishes or stops being the active game.
+ * @param {object} game Active TentooGame instance
+ * @param {string[]} wordlist Accepted word list for candidate filtering
+ * @param {() => object} getGame Returns the active game instance
+ * @returns {Promise<number>} Number of guesses accepted and committed by Jev
+ */
+async function playGame(game, wordlist, getGame) {
+  let committed = 0;
+  let attemptMarked = false;
   while (!game.finished) {
+    if (getGame() !== game) break;
     const state = buildGameState(game);
     const { pools, triedWords, triedLetters } = solverInputs(state, wordlist);
-    const boardIndexes = Object.keys(pools);
-    if (boardIndexes.length === 0) break;
-    if (boardIndexes.some(index => pools[index].length === 0)) {
+    if (Object.keys(pools).length === 0) break;
+    if (Object.values(pools).some(pool => pool.length === 0)) {
       throw new JevError('nenhuma palavra do dicionário casa com o feedback');
     }
     const attemptsLeft = state.maxRows - state.currentRow;
@@ -67,12 +75,21 @@ async function playGame(game, wordlist) {
       const decision = await decide(buildStateText(state, pools, options), options);
       word = decision.word;
     }
+    if (getGame() !== game) break;
     game.isJevGame = true;
     const accepted = await submitWord(game, word);
     if (!accepted) throw new JevError(`o palpite ${word} foi rejeitado`);
+    committed++;
+    if (!attemptMarked) {
+      markAttemptUsed();
+      attemptMarked = true;
+    }
     await pause();
   }
-  game.showToast(game.won ? '🤖 O Jev venceu!' : '🤖 O Jev perdeu');
+  if (getGame() === game) {
+    game.showToast(game.won ? '🤖 O Jev venceu!' : '🤖 O Jev perdeu');
+  }
+  return committed;
 }
 
 /** @param {object} game Game that received the trigger @param {(mode: string) => void} startGame Rebuilds the game for a mode @param {() => object} getGame Returns the active game instance */
@@ -88,17 +105,25 @@ async function handleTrigger(game, startGame, getGame) {
   }
   const wordlist = game.dictionaryService.words;
   const mode = game.mode;
-  markAttemptUsed();
-  localStorage.removeItem(gameStateStorageKey(mode));
+  const stateKey = gameStateStorageKey(mode);
+  const previousState = localStorage.getItem(stateKey);
+  localStorage.removeItem(stateKey);
   startGame(mode);
   const fresh = getGame();
   if (!fresh) return;
   fresh.jevPlaying = true;
   fresh.showToast('🤖 O Jev assumiu o jogo');
   try {
-    await playGame(fresh, wordlist);
+    await playGame(fresh, wordlist, getGame);
   } catch (error) {
-    fresh.showToast(`🤖 O Jev não conseguiu continuar: ${error.message}`);
+    if (fresh.guesses.flat().length === 0) {
+      if (previousState === null) localStorage.removeItem(stateKey);
+      else localStorage.setItem(stateKey, previousState);
+      if (getGame() === fresh) startGame(mode);
+      getGame()?.showToast(`🤖 O Jev não conseguiu continuar: ${error.message} — seu jogo anterior foi restaurado`);
+    } else {
+      fresh.showToast(`🤖 O Jev não conseguiu continuar: ${error.message}`);
+    }
   } finally {
     fresh.jevPlaying = false;
   }

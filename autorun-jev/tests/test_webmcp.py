@@ -22,7 +22,7 @@ def should_clear_saved_state_and_reload_on_reset(monkeypatch):
     # Given
     connection = _StubConnection()
     session = WebMcpSession(connection)
-    monkeypatch.setattr(session, "wait_ready", lambda: None)
+    monkeypatch.setattr(session, "wait_ready", lambda timeout=20.0: None)
 
     # When
     session.reset_game("dueto")

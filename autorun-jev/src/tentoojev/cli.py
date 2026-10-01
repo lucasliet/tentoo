@@ -120,7 +120,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         navigate_page(connection, settings.tentoo_url, timeout=settings.timeout)
         session = WebMcpSession(connection)
         session.wait_ready(timeout=settings.timeout)
-        session.reset_game(mode)
+        session.reset_game(mode, timeout=settings.timeout)
         print(f"Tentoo ready with WebMCP tools at {settings.tentoo_url} (previous {mode} game cleared)")
         jev = JevClient(
             settings.jev_api_url,

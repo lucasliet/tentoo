@@ -92,6 +92,8 @@ def run_game(
                 break
             time.sleep(0.5)
             state = session.get_state()
+        if not state.get("finished") and state.get("currentRow", 0) == previous_row:
+            raise GameLoopError(f"Guess {guess_word} was not accepted: {submit_result}")
         boards = state.get("boards", [])
         board_feedback = " ".join(
             f"b{index + 1} {board.get('rows', [{}])[-1].get('feedback', '')}"

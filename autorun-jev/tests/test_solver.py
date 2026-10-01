@@ -7,6 +7,7 @@ from tentoojev.solver import (
     GRAY,
     YELLOW,
     build_options,
+    build_state_text,
     filter_candidates,
     load_wordlist,
     matches_feedback,
@@ -131,3 +132,24 @@ def should_fall_back_to_ranked_options_when_every_candidate_is_suppressed():
 
     # Then
     assert set(options) == {"abril", "abris", "abrir"}
+
+
+def should_build_state_text_with_header_history_and_options():
+    # Given
+    state = {
+        "mode": "quarteto",
+        "currentRow": 1,
+        "maxRows": 9,
+        "boards": [{"rows": [{"guess": "areio", "feedback": GREEN + GRAY + GRAY + GRAY + GRAY}]}],
+    }
+    pools = {0: ["abril", "abrir"]}
+
+    # When
+    text = build_state_text(state, pools, [("abrir", "solves board 1; new letters none")])
+
+    # Then
+    assert "quarteto mode: 1 unsolved board(s)" in text
+    assert "Attempts remaining: 8." in text
+    assert f"areio {GREEN + GRAY + GRAY + GRAY + GRAY}" in text
+    assert "Options for the next guess:" in text
+    assert "- abrir: solves board 1; new letters none" in text
