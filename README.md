@@ -36,6 +36,10 @@ Em seguida, abra `http://localhost:8080` no seu navegador favorito.
 
 O Tentoo grava as informações de progresso do usuário (jogadas e estado do tabuleiro atual) de forma inofensiva no `localStorage` sob a chave base `tentoo_game_state` e estatísticas sob `tentoo_stats`. Seu jogo fica salvo caso recarregue o navegador acidentalmente.
 
+## 📱 PWA
+
+O Tentoo é instalável (menu "Instalar app" do Chrome/Edge ou "Adicionar à Tela de Início" no iOS/Android). O service worker (`sw.js`) precacha o app shell completo (HTML, CSS, módulos JS, ícones e a lista de palavras) na primeira visita: o jogo funciona 100% offline. Quando a conexão volta, os assets são revalidados em background (stale-while-revalidate), o HTML vem sempre da rede quando online (network-first) e caches de versões antigas são descartados automaticamente a cada novo deploy.
+
 ## 🤖 Modo secreto: Jev
 
 Existe um modo secreto de autoplay. Digite `jevbt` como tentativa e pressione Enter (não conta como palpite): o jogo reinicia e o **Jev** (modelo System One da TypeSafe AI via OpenCode Zen) joga a palavra do dia por você, decidindo cada palpite em tempo real.

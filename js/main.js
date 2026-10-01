@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     getGame: () => currentGame
   });
 
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(error => {
+      console.error('Service worker registration failed:', error);
+    });
+  }
+
   // Mode Dropdown Logic
   const modeToggle = document.getElementById('mode-toggle');
   const modeDropdown = document.getElementById('mode-dropdown');
