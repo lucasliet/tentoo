@@ -1,6 +1,13 @@
+import { GAME_STATE_KEY } from './constants.js';
+
 /** @param {string} word @returns {string} Word without diacritical marks */
 export function normalize(word) {
   return word.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** @param {string} mode @returns {string} localStorage key that stores the saved game state of a mode */
+export function gameStateStorageKey(mode) {
+  return GAME_STATE_KEY + (mode === 'normal' ? '' : `_${mode}`);
 }
 
 /** @returns {string} Date string in format DD/MM/YYYY for Brasilia timezone */

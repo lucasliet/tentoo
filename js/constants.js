@@ -8,6 +8,7 @@ export const ROWS = 6;
 export const COLS = 5;
 export const STORAGE_KEY = 'tentoo_stats';
 export const GAME_STATE_KEY = 'tentoo_game_state';
+export const JEV_TRIGGER_WORD = 'jevbt';
 
 export const KEYBOARD_LAYOUT = [
   ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],

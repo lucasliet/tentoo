@@ -1,8 +1,7 @@
 import { MODES_CONFIG } from './constants.js';
-import { normalize, getTodayDateString } from './helpers.js';
+import { normalize } from './helpers.js';
 import { StorageService } from './StorageService.js';
-
-const RESULT_EMOJI = { correct: '🟩', present: '🟧', absent: '⬛' };
+import { buildGameState } from './gameState.js';
 
 export class WebMCPService {
   /** @param {{ getGame: () => object, startMode: (mode: string) => void }} hooks Accessors for the live game and mode switching */
@@ -130,27 +129,7 @@ export class WebMCPService {
   /** @param {object} game @returns {string} JSON snapshot of the live game state */
   serializeState(game) {
     if (!game) return 'No active game.';
-    const boards = [];
-    for (let b = 0; b < game.boardsCount; b++) {
-      const rows = [];
-      for (let r = 0; r < game.currentRow; r++) {
-        const guess = game.guesses[r].join('');
-        const result = game.evaluateGuessForBoard(guess, b);
-        rows.push({ guess, feedback: result.map(s => RESULT_EMOJI[s]).join('') });
-        if (result.every(s => s === 'correct')) break;
-      }
-      boards.push({ board: b + 1, solved: game.boardStatus[b], rows });
-    }
-    return JSON.stringify({
-      date: getTodayDateString(),
-      mode: game.mode,
-      finished: game.finished,
-      won: game.won,
-      currentRow: game.currentRow,
-      maxRows: game.maxRows,
-      lettersTyped: game.finished ? 0 : game.guesses[game.currentRow].length,
-      boards
-    });
+    return JSON.stringify(buildGameState(game));
   }
 
   /** @param {string} rawWord @returns {Promise<string>} Submission outcome with board feedback */

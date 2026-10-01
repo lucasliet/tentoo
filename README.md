@@ -36,5 +36,14 @@ Em seguida, abra `http://localhost:8080` no seu navegador favorito.
 
 O Tentoo grava as informações de progresso do usuário (jogadas e estado do tabuleiro atual) de forma inofensiva no `localStorage` sob a chave base `tentoo_game_state` e estatísticas sob `tentoo_stats`. Seu jogo fica salvo caso recarregue o navegador acidentalmente.
 
+## 🤖 Modo secreto: Jev
+
+Existe um modo secreto de autoplay. Digite `jevbt` como tentativa e pressione Enter (não conta como palpite): o jogo reinicia e o **Jev** (modelo System One da TypeSafe AI via OpenCode Zen) joga a palavra do dia por você, decidindo cada palpite em tempo real.
+
+- **1 tentativa por dia** por dispositivo, compartilhada entre normal, dueto e quarteto.
+- O jogo do Jev **não conta** para suas estatísticas nem streak.
+- O Jev não trapaceia: escolhe apenas entre palavras da lista pública `palavras_aceitas.txt`, filtradas pelo feedback dos tabuleiros — o mesmo solver do bot externo.
+- As decisões passam por `/api/jev` (Cloudflare Pages Function), que guarda a `OPENCODE_API_KEY` como secret no servidor; nenhuma chave chega ao navegador.
+
 ---
 Feito com dedicação. Divirta-se tentando adivinhar as palavras!

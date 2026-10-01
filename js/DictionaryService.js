@@ -5,6 +5,11 @@ export class DictionaryService {
     this.normalizedSet = new Set();
   }
 
+  /** @returns {string[]} All normalized words currently loaded in the dictionary */
+  get words() {
+    return Array.from(this.normalizedSet);
+  }
+
   initFromWords(WORDS) {
     this.normalizedSet = new Set(WORDS.map(w => normalize(w)));
   }

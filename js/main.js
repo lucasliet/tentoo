@@ -2,6 +2,7 @@ import { WORDS, DUETO_INDEXES, QUARTETO_INDEXES } from './constants.js';
 import { DictionaryService } from './DictionaryService.js';
 import { TentooGame } from './TentooGame.js';
 import { WebMCPService } from './WebMCPService.js';
+import { initJevAutoplay } from './jev/autoplay.js';
 
 let currentGame = null;
 const dictionaryService = new DictionaryService();
@@ -23,6 +24,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     getGame: () => currentGame,
     startMode: startGame
   }).init();
+
+  initJevAutoplay({
+    startGame,
+    getGame: () => currentGame
+  });
 
   // Mode Dropdown Logic
   const modeToggle = document.getElementById('mode-toggle');

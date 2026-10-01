@@ -1,10 +1,10 @@
-import { STORAGE_KEY, GAME_STATE_KEY } from './constants.js';
-import { getTodayDateString } from './helpers.js';
+import { STORAGE_KEY } from './constants.js';
+import { gameStateStorageKey, getTodayDateString } from './helpers.js';
 
 export class StorageService {
   constructor(mode, maxRows) {
     this.storageKeyStats = STORAGE_KEY + (mode === 'normal' ? '' : '_' + mode);
-    this.storageKeyGame = GAME_STATE_KEY + (mode === 'normal' ? '' : '_' + mode);
+    this.storageKeyGame = gameStateStorageKey(mode);
     this.maxRows = maxRows;
   }
 

@@ -1,4 +1,4 @@
-import { COLS, MODES_CONFIG } from './constants.js';
+import { COLS, MODES_CONFIG, JEV_TRIGGER_WORD } from './constants.js';
 import { normalize, getTodayDateString, getWordsForMode } from './helpers.js';
 import { StorageService } from './StorageService.js';
 import { BoardComponent } from './BoardComponent.js';
@@ -30,6 +30,8 @@ export class TentooGame {
     this.won = false;
     this.keyStates = {};
     this.isAnimating = false;
+    this.jevPlaying = false;
+    this.isJevGame = false;
 
     this.boardsContainerEl = document.getElementById('boards-container');
     this.keyboardEl = document.getElementById('keyboard');
@@ -117,7 +119,8 @@ export class TentooGame {
       currentRow: this.currentRow,
       finished: this.finished,
       won: this.won,
-      boardStatus: this.boardStatus
+      boardStatus: this.boardStatus,
+      jev: this.isJevGame
     });
   }
 
@@ -165,6 +168,7 @@ export class TentooGame {
     this.won = saved.won;
     this.guesses = saved.guesses;
     this.boardStatus = saved.boardStatus || Array(this.boardsCount).fill(false);
+    this.isJevGame = saved.jev === true;
 
     for (let r = 0; r < saved.guesses.length; r++) {
       const guess = saved.guesses[r];
@@ -198,7 +202,7 @@ export class TentooGame {
   }
 
   handleKey(key) {
-    if (this.finished || this.isAnimating) return;
+    if (this.finished || this.isAnimating || this.jevPlaying) return;
     if (key === 'enter') this.submitGuess();
     else if (key === 'backspace') this.deleteLetter();
     else this.addLetter(key);
@@ -267,6 +271,11 @@ export class TentooGame {
       return;
     }
     const strGuess = this.guesses[this.currentRow].join('');
+    if (strGuess === JEV_TRIGGER_WORD) {
+      while (this.currentCol > 0) this.deleteLetter();
+      document.dispatchEvent(new CustomEvent('tentoo:jev-trigger', { detail: { game: this } }));
+      return;
+    }
     if (!this.dictionaryService.has(strGuess)) {
       this.board.shakeRows(this.boardStatus, this.currentRow);
       this.showToast('Palavra repetida ou não encontrada');
@@ -307,22 +316,26 @@ export class TentooGame {
         this.saveGameState();
         this.confetti.burst(this.wordsOriginal);
 
-        const stats = this.loadStats();
-        stats.played++; stats.won++; stats.distribution[this.currentRow - 1]++;
-        stats.lastDate = getTodayDateString();
-        const y = new Date(); y.setDate(y.getDate() - 1);
-        stats.streak = stats.lastDate === y.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) || stats.streak > 0 ? stats.streak + 1 : 1;
-        stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
-        this.saveStats(stats);
+        if (!this.isJevGame) {
+          const stats = this.loadStats();
+          stats.played++; stats.won++; stats.distribution[this.currentRow - 1]++;
+          stats.lastDate = getTodayDateString();
+          const y = new Date(); y.setDate(y.getDate() - 1);
+          stats.streak = stats.lastDate === y.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) || stats.streak > 0 ? stats.streak + 1 : 1;
+          stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
+          this.saveStats(stats);
+        }
 
         setTimeout(() => this.showEndScreen(), 1200);
       } else if (this.currentRow >= this.maxRows) {
         this.finished = true;
         this.won = false;
         this.saveGameState();
-        const stats = this.loadStats();
-        stats.played++; stats.streak = 0; stats.lastDate = getTodayDateString();
-        this.saveStats(stats);
+        if (!this.isJevGame) {
+          const stats = this.loadStats();
+          stats.played++; stats.streak = 0; stats.lastDate = getTodayDateString();
+          this.saveStats(stats);
+        }
         setTimeout(() => this.showEndScreen(), 800);
       } else {
         this.currentCol = 0;
