@@ -21,3 +21,9 @@ export const MODES_CONFIG = {
   dueto: { boards: 2, rows: 7 },
   quarteto: { boards: 4, rows: 9 }
 };
+
+/** @param {string} hash URL hash, with or without the leading '#' @returns {string} Mode matching the hash or 'normal' when unknown or empty */
+export const modeFromHash = (hash) => {
+  const mode = String(hash || '').replace(/^#/, '').toLowerCase();
+  return mode in MODES_CONFIG ? mode : 'normal';
+};

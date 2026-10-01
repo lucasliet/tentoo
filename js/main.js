@@ -1,4 +1,4 @@
-import { WORDS, DUETO_INDEXES, QUARTETO_INDEXES } from './constants.js';
+import { WORDS, DUETO_INDEXES, QUARTETO_INDEXES, modeFromHash } from './constants.js';
 import { DictionaryService } from './DictionaryService.js';
 import { TentooGame } from './TentooGame.js';
 import { WebMCPService } from './WebMCPService.js';
@@ -7,8 +7,18 @@ import { initJevAutoplay } from './jev/autoplay.js';
 let currentGame = null;
 const dictionaryService = new DictionaryService();
 
+/** @param {string} mode Keeps the URL hash in sync with the active mode */
+const syncModeHash = (mode) => {
+  try {
+    const hash = mode === 'normal' ? '' : `#${mode}`;
+    history.replaceState(null, '', location.pathname + location.search + hash);
+  } catch {
+  }
+};
+
 /** @param {string} mode Rebuilds the active game for the given mode and syncs the dropdown */
 const startGame = (mode) => {
+  syncModeHash(mode);
   document.querySelectorAll('.mode-option').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   if (currentGame) currentGame.destroy();
   currentGame = new TentooGame(mode, dictionaryService, WORDS, DUETO_INDEXES, QUARTETO_INDEXES);
@@ -18,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   dictionaryService.initFromWords(WORDS);
   await dictionaryService.loadAcceptedWords('palavras_aceitas.txt');
 
-  startGame('normal');
+  startGame(modeFromHash(location.hash));
 
   new WebMCPService({
     getGame: () => currentGame,
@@ -115,4 +125,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   window.__tentoo = { getGame: () => currentGame, startGame };
+
+  window.addEventListener('hashchange', () => {
+    const mode = modeFromHash(location.hash);
+    if (!currentGame || mode !== currentGame.mode) startGame(mode);
+  });
 });
