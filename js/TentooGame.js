@@ -352,10 +352,15 @@ export class TentooGame {
     let wordsHtml = '';
     this.wordsOriginal.forEach((w, i) => wordsHtml += `<div class="result-word ${this.won ? 'win' : 'lose'}" style="--wi:${i}">${w}</div>`);
 
+    const message = this.isJevGame
+      ? `alvo ${this.won ? `comprometido em ${this.currentRow} ciclos` : 'não comprometido — 100% dos ciclos utilizados'}`
+      : (this.won ? `Sensacional! Completo em ${this.currentRow} tentativa(s).` : 'Não foi dessa vez! Volte amanhã.');
+
     let html = `
+      ${this.isJevGame ? '<div class="result-badge">🤖 JEV · AUTOPLAY</div>' : ''}
       <div class="result-section" style="border:none; padding-top:0; margin-bottom:20px; text-align:center;">
         <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap; margin-bottom:12px;">${wordsHtml}</div>
-        <div class="result-message">${this.won ? `Sensacional! Completo em ${this.currentRow} tentativa(s).` : 'Não foi dessa vez! Volte amanhã.'}</div>
+        <div class="result-message">${message}</div>
       </div>
       <div class="stats-title">Estatísticas - ${this.mode.toUpperCase()}</div>
       <div class="stats-grid">
@@ -374,6 +379,7 @@ export class TentooGame {
     `;
 
     this.resultContent.innerHTML = html;
+    this.resultContent.classList.toggle('jev', this.isJevGame);
     this.resultOverlay.classList.remove('hidden');
     document.getElementById('share-btn').addEventListener('click', () => this.shareResult());
   }
@@ -405,7 +411,11 @@ export class TentooGame {
     const emojiMap = { correct: '🟩', present: '🟧', absent: '⬛' };
     let text = `Tentoo ${getTodayDateString()} ${this.won ? this.currentRow : 'X'}/${this.maxRows}`;
     if (this.mode !== 'normal') text += ` [${this.mode.toUpperCase()}]`;
-    text += `\n\n`;
+    text += '\n';
+    if (this.isJevGame) {
+      text += `🤖 ${this.won ? 'Vitória' : 'Derrota'} do bot Jev (autoplay)\n`;
+    }
+    text += '\n';
 
     for (let b = 0; b < this.boardsCount; b++) {
       for (let r = 0; r < this.currentRow; r++) {

@@ -959,3 +959,49 @@ header {
     --key-height: 40px;
   }
 }
+
+.result-badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-correct);
+  border: 1px solid var(--color-correct-glow);
+  background: rgba(46, 204, 113, 0.08);
+  border-radius: 6px;
+  padding: 6px 14px;
+  margin-bottom: 16px;
+  display: inline-block;
+}
+
+.result-content.jev .result-message {
+  font-family: var(--font-mono);
+  color: var(--color-correct);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.result-content.jev .result-message::before {
+  content: '> ';
+}
+
+.result-content.jev .result-message::after {
+  content: '▊';
+  animation: jev-cursor 900ms steps(1) infinite;
+}
+
+.modal:has(.result-content.jev) {
+  border-color: var(--color-correct-glow);
+  box-shadow: 0 0 40px var(--color-correct-glow);
+}
+
+@keyframes jev-cursor {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-content.jev .result-message::after {
+    animation: none;
+  }
+}
